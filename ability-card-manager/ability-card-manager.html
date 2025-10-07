@@ -16,11 +16,11 @@
 
         .filters { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
         select { padding: 6px; font-size: 14px; }
-        .controls { margin-top: 10px; text-align: center; }
+        .controls { margin-top: 10px; text-align: center; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
         button { padding: 6px 12px; font-size: 14px; margin-bottom: 10px; }
         .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
         .card { background: white; padding: 10px; border-radius: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.2); text-align: center; }
-        .card img { max-width: 100%; border-radius: 6px; }
+        .card img { max-width: 100%; border-radius: 6px; cursor: pointer; box-sizing: border-box; }
     </style>
 </head>
 <body>
@@ -64,6 +64,19 @@
 </div>
 
 <div class="controls">
+    <label>
+        Update Area for Selected Cards:
+        <select id="bulkAreaSelect">
+            <option value="">--Select Area--</option>
+            <option value="hand">Hand</option>
+            <option value="active">Active</option>
+            <option value="play">Play</option>
+            <option value="discard">Discard</option>
+            <option value="burn">Burn</option>
+            <option value="locked">Locked</option>
+            <option value="unused">Unused</option>
+        </select>
+    </label>
     <button id="moveToHand">Move Play Mode Cards to Hand</button>
     <button id="moveToUnused">Move Play Mode Cards to Unused</button>
 </div>
@@ -76,6 +89,7 @@
     const activeClasses = document.getElementById("activeClasses");
     const classFilter = document.getElementById("classFilter");
     const areaFilter = document.getElementById("areaFilter");
+    const bulkAreaSelect = document.getElementById("bulkAreaSelect");
     const moveToHandBtn = document.getElementById("moveToHand");
     const moveToUnusedBtn = document.getElementById("moveToUnused");
     const modeSelector = document.getElementById("modeSelector");
@@ -84,17 +98,27 @@
     const setupAreas = ["hand","locked","unused"];
     const allAreas = ["hand","active","play","discard","burn","locked","unused"];
 
-    // Convert old "unused level one/2+" to "unused"
+    const areaColors = {
+      hand: "gray",
+      active: "blue",
+      play: "green",
+      discard: "orange",
+      burn: "red",
+      locked: "black",
+      unused: "purple"
+    };
+
+    // Merge old unused statuses
     images.forEach(img => {
       if(img.status === "unused level one" || img.status === "unused level 2+") img.status = "unused";
     });
 
-    // Load/Save state including mode and active classes
+    let selectedCards = new Set();
+
     function loadSavedState() {
       const saved = localStorage.getItem("cardState");
       if(saved) {
         const obj = JSON.parse(saved);
-
         images.forEach(img => { if(obj.statuses[img.url]) img.status = obj.statuses[img.url]; });
         if(obj.mode) modeSelector.value = obj.mode;
         if(obj.activeClasses) {
@@ -115,13 +139,6 @@
       localStorage.setItem("cardState", JSON.stringify(obj));
     }
 
-    function resetAllStatuses() {
-      images.forEach(img => img.status = "hand");
-      saveState();
-      renderGallery();
-    }
-
-    // Populate Active Classes
     function populateActiveClasses() {
       allClasses.forEach(cls => {
         const opt = document.createElement("option");
@@ -131,7 +148,6 @@
       });
     }
 
-    // Update Class dropdown based on Active Classes
     function updateClassFilter() {
       const selected = Array.from(activeClasses.selectedOptions).map(o => o.value);
       classFilter.innerHTML = "<option value='all'>All</option>";
@@ -143,7 +159,6 @@
       });
     }
 
-    // Update Area dropdown based on Mode
     function updateAreaFilter() {
       const mode = modeSelector.value;
       let allowed = [];
@@ -162,7 +177,6 @@
       });
     }
 
-    // Render gallery
     function renderGallery() {
       const areaVal = areaFilter.value;
       const mode = modeSelector.value;
@@ -188,27 +202,53 @@
           const card = document.createElement("div");
           card.className = "card";
 
-          const select = document.createElement("select");
-          allowedAreas.forEach(st => {
-            const opt = document.createElement("option");
-            opt.value = st;
-            opt.textContent = st;
-            select.appendChild(opt);
-          });
-          select.value = img.status;
+          const imgElement = document.createElement("img");
+          imgElement.src = img.url;
+          imgElement.alt = img.class;
+          imgElement.style.border = `4px solid ${areaColors[img.status] || "black"}`;
+          imgElement.style.borderRadius = "6px";
+          imgElement.style.cursor = "pointer";
+          imgElement.style.boxSizing = "border-box";
 
-          select.addEventListener("change", () => {
-            img.status = select.value;
-            saveState();
+          // Highlight selection
+          if(selectedCards.has(img)) imgElement.style.boxShadow = "0 0 10px 4px yellow";
+          else imgElement.style.boxShadow = "";
+
+          // Select/deselect
+          imgElement.addEventListener("click", () => {
+            if(selectedCards.has(img)) selectedCards.delete(img);
+            else selectedCards.add(img);
             renderGallery();
           });
 
-          card.innerHTML = `<img src="${img.url}" alt="${img.class}">`;
-          card.appendChild(select);
+          card.appendChild(imgElement);
           gallery.appendChild(card);
         }
       });
     }
+
+    // Bulk area update
+    bulkAreaSelect.addEventListener("change", () => {
+      const newArea = bulkAreaSelect.value;
+      if(!newArea) return;
+      selectedCards.forEach(img => img.status = newArea);
+      saveState();
+      selectedCards.clear();
+      bulkAreaSelect.value = "";
+      renderGallery();
+    });
+
+    // Move Play Mode Cards
+    function movePlayModeCards(targetArea) {
+      images.forEach(img => {
+        if(playAreas.includes(img.status)) img.status = targetArea;
+      });
+      saveState();
+      renderGallery();
+    }
+
+    moveToHandBtn.addEventListener("click", () => movePlayModeCards("hand"));
+    moveToUnusedBtn.addEventListener("click", () => movePlayModeCards("unused"));
 
     // Event listeners
     activeClasses.addEventListener("change", () => {
@@ -223,25 +263,11 @@
 
     classFilter.addEventListener("change", renderGallery);
     areaFilter.addEventListener("change", renderGallery);
-
     modeSelector.addEventListener("change", () => {
       updateAreaFilter();
       saveState();
       renderGallery();
     });
-
-    function movePlayModeCards(targetArea) {
-      images.forEach(img => {
-        if(playAreas.includes(img.status)) {
-          img.status = targetArea;
-        }
-      });
-      saveState();
-      renderGallery();
-    }
-
-    moveToHandBtn.addEventListener("click", () => movePlayModeCards("hand"));
-    moveToUnusedBtn.addEventListener("click", () => movePlayModeCards("unused"));
 
     // Initialize
     populateActiveClasses();
