@@ -64,7 +64,8 @@
 </div>
 
 <div class="controls">
-    <button id="resetAll">Reset All Statuses</button>
+    <button id="moveToHand">Move Play Mode Cards to Hand</button>
+    <button id="moveToUnused">Move Play Mode Cards to Unused</button>
 </div>
 
 <div class="gallery" id="gallery"></div>
@@ -75,7 +76,8 @@
     const activeClasses = document.getElementById("activeClasses");
     const classFilter = document.getElementById("classFilter");
     const areaFilter = document.getElementById("areaFilter");
-    const resetAllBtn = document.getElementById("resetAll");
+    const moveToHandBtn = document.getElementById("moveToHand");
+    const moveToUnusedBtn = document.getElementById("moveToUnused");
     const modeSelector = document.getElementById("modeSelector");
 
     const playAreas = ["hand","play","discard","active","burn"];
@@ -158,14 +160,6 @@
         opt.textContent = a;
         areaFilter.appendChild(opt);
       });
-
-      // If setup mode, move cards in play mode areas to hand
-      if(mode === "setup") {
-        images.forEach(img => {
-          if(playAreas.includes(img.status)) img.status = "hand";
-        });
-        saveState();
-      }
     }
 
     // Render gallery
@@ -236,9 +230,18 @@
       renderGallery();
     });
 
-    resetAllBtn.addEventListener("click", () => {
-      if(confirm("Reset all statuses to 'hand'?")) resetAllStatuses();
-    });
+    function movePlayModeCards(targetArea) {
+      images.forEach(img => {
+        if(playAreas.includes(img.status)) {
+          img.status = targetArea;
+        }
+      });
+      saveState();
+      renderGallery();
+    }
+
+    moveToHandBtn.addEventListener("click", () => movePlayModeCards("hand"));
+    moveToUnusedBtn.addEventListener("click", () => movePlayModeCards("unused"));
 
     // Initialize
     populateActiveClasses();
