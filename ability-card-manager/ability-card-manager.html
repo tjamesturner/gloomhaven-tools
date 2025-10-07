@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Gloomhaven Card Browser</title>
+    <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 20px;
+          background: #f4f4f4;
+        }
+        h1 {
+          text-align: center;
+        }
+        .filters {
+          display: flex;
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: 20px;
+          margin-bottom: 20px;
+        }
+        select {
+          padding: 6px;
+          font-size: 14px;
+        }
+        select[multiple] {
+          height: 8em;
+          width: 180px;
+        }
+        .controls {
+          margin-top: 10px;
+          text-align: center;
+        }
+        button {
+          padding: 6px 12px;
+          font-size: 14px;
+        }
+        .gallery {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+          gap: 15px;
+        }
+        .card {
+          background: white;
+          padding: 10px;
+          border-radius: 10px;
+          box-shadow: 0 0 5px rgba(0,0,0,0.2);
+          text-align: center;
+        }
+        .card img {
+          max-width: 100%;
+          border-radius: 6px;
+        }
+        .status-dropdown {
+          margin-top: 6px;
+        }
+    </style>
+</head>
+<body>
+<h1>Gloomhaven Card Browser</h1>
+
+<div class="filters">
+    <label>
+        Active Classes (pick up to 4):<br>
+        <select id="activeClasses" multiple></select>
+    </label>
+    <label>
+        Class:<br>
+        <select id="classFilter">
+            <option value="all">All</option>
+        </select>
+    </label>
+    <label>
+        Category:<br>
+        <select id="categoryFilter">
+            <option value="all">All</option>
+            <option value="hand">Hand</option>
+            <option value="active">Active</option>
+            <option value="play">Play</option>
+            <option value="discard">Discard</option>
+            <option value="burn">Burn</option>
+            <option value="locked">Locked</option>
+            <option value="unused level one">Unused Level One</option>
+            <option value="unused level 2+">Unused Level 2+</option>
+        </select>
+    </label>
+</div>
+
+<div class="controls">
+    <button id="resetAll">Reset All Statuses</button>
+</div>
+
+<div class="gallery" id="gallery"></div>
+
+<script>
+    // -------------------
+    // Data
+    // -------------------
+    const statuses = [
+      "hand","active","play","discard","burn","locked","unused level one","unused level 2+"
+    ];
+
+    // Example: mindthief cards only for now
+    const images = [
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/empathetic-assault.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/frigid-apparition.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/hidden-in-the-shadows.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/perverse-edge.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/pilfer.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/psychic-blade.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/scurry.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/submissive-affliction.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/the-minds-weakness.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/withering-claw.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/feedback-loops.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/gnawing-horde.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/possession.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/fearsome-blade.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/hostile-takeover.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/brain-leech.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/cranium-overload.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/frozen-shiv.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/silent-scream.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/gangling-abomination.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/mass-hysteria.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/dark-frenzy.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/telepathic-command.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/domination.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/psychic-projection.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/corrupting-embrace.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/shared-nightmare.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/many-as-one.jpeg", class: "mindthief", status: "hand" },
+        { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/MT2/phantasmal-killer.jpeg", class: "mindthief", status: "hand" }
+    ];
+
+    // full list of 18 classes (2nd edition placeholder names)
+    const allClasses = [
+        "doomstalker",
+        "berserker",
+        "bladeswarm",
+        "bruiser",
+        "soothsinger",
+        "summoner",
+        "cragheart",
+        "mindthief",
+        "nightshroud",
+        "sawbones",
+        "silent Knife",
+        "spellweaver",
+        "plagueherald",
+        "sunkeeper",
+        "quartermaster",
+        "tinkerer",
+        "elementalist",
+        "wildfury"
+    ];
+
+    const gallery = document.getElementById("gallery");
+    const activeClasses = document.getElementById("activeClasses");
+    const classFilter = document.getElementById("classFilter");
+    const categoryFilter = document.getElementById("categoryFilter");
+    const resetAllBtn = document.getElementById("resetAll");
+
+    // -------------------
+    // Local storage
+    // -------------------
+    function loadSavedStatuses() {
+      const saved = localStorage.getItem("cardStatuses");
+      if (saved) {
+        try {
+          const obj = JSON.parse(saved);
+          images.forEach(img => {
+            if (obj.hasOwnProperty(img.url)) {
+              img.status = obj[img.url];
+            }
+          });
+        } catch (e) { console.warn("Bad saved data", e); }
+      }
+    }
+
+    function saveStatuses() {
+      const obj = {};
+      images.forEach(img => obj[img.url] = img.status);
+      localStorage.setItem("cardStatuses", JSON.stringify(obj));
+    }
+
+    function resetAllStatuses() {
+      images.forEach(img => img.status = "hand");
+      saveStatuses();
+      renderGallery();
+    }
+
+    // -------------------
+    // Filters
+    // -------------------
+    function populateActiveClasses() {
+      allClasses.forEach(cls => {
+        const opt = document.createElement("option");
+        opt.value = cls;
+        opt.textContent = cls;
+        activeClasses.appendChild(opt);
+      });
+    }
+
+    function updateClassFilter() {
+      const selected = Array.from(activeClasses.selectedOptions).map(o => o.value);
+      classFilter.innerHTML = '<option value="all">All</option>';
+      selected.forEach(cls => {
+        const opt = document.createElement("option");
+        opt.value = cls;
+        opt.textContent = cls;
+        classFilter.appendChild(opt);
+      });
+    }
+
+    // Limit to 4 selections
+    activeClasses.addEventListener("change", () => {
+      const selected = Array.from(activeClasses.selectedOptions);
+      if (selected.length > 4) {
+        selected[selected.length - 1].selected = false;
+        alert("You can select up to 4 active classes.");
+      }
+      updateClassFilter();
+      renderGallery();
+    });
+
+    classFilter.addEventListener("change", renderGallery);
+    categoryFilter.addEventListener("change", renderGallery);
+    resetAllBtn.addEventListener("click", () => {
+      if (confirm("Reset all statuses to 'hand'?")) resetAllStatuses();
+    });
+
+    // -------------------
+    // Gallery Rendering
+    // -------------------
+    function renderGallery() {
+      const selectedActive = Array.from(activeClasses.selectedOptions).map(o => o.value);
+      const classVal = classFilter.value;
+      const catVal = categoryFilter.value;
+
+      gallery.innerHTML = "";
+
+      images.forEach(img => {
+        if ((selectedActive.length === 0 || selectedActive.includes(img.class)) &&
+            (classVal === "all" || img.class === classVal) &&
+            (catVal === "all" || img.status === catVal)) {
+
+          const card = document.createElement("div");
+          card.className = "card";
+          const imgEl = document.createElement("img");
+          imgEl.src = img.url;
+          imgEl.alt = img.class;
+
+          const dropdown = document.createElement("select");
+          dropdown.className = "status-dropdown";
+          statuses.forEach(status => {
+            const opt = document.createElement("option");
+            opt.value = status;
+            opt.textContent = status;
+            if (status === img.status) opt.selected = true;
+            dropdown.appendChild(opt);
+          });
+          dropdown.addEventListener("change", () => {
+            img.status = dropdown.value;
+            saveStatuses();
+          });
+
+          card.appendChild(imgEl);
+          card.appendChild(dropdown);
+          gallery.appendChild(card);
+        }
+      });
+    }
+
+    // -------------------
+    // Init
+    // -------------------
+    loadSavedStatuses();
+    populateActiveClasses();
+    updateClassFilter();
+    renderGallery();
+</script>
+</body>
+</html>
