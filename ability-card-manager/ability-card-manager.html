@@ -49,8 +49,7 @@
             <option value="discard">Discard</option>
             <option value="burn">Burn</option>
             <option value="locked">Locked</option>
-            <option value="unused level one">Unused Level One</option>
-            <option value="unused level 2+">Unused Level 2+</option>
+            <option value="unused">Unused</option>
         </select>
     </label>
 </div>
@@ -70,8 +69,15 @@
     const resetAllBtn = document.getElementById("resetAll");
     const modeSelector = document.getElementById("modeSelector");
 
+    // Define allowed areas per mode
     const playAreas = ["hand","play","discard","active","burn"];
-    const setupAreas = ["hand","locked","unused level one","unused level 2+"];
+    const setupAreas = ["hand","locked","unused"];
+    const allAreas = ["hand","active","play","discard","burn","locked","unused"];
+
+    // Convert any old "unused level one/level 2+" to "unused"
+    images.forEach(img => {
+      if(img.status === "unused level one" || img.status === "unused level 2+") img.status = "unused";
+    });
 
     // Persistence
     function loadSavedStatuses() {
@@ -120,7 +126,7 @@
       let allowed = [];
       if(mode === "play") allowed = playAreas;
       else if(mode === "setup") allowed = setupAreas;
-      else allowed = ["hand","active","play","discard","burn","locked","unused level one","unused level 2+"];
+      else allowed = allAreas;
 
       // Reset selected area if invalid
       if(!allowed.includes(areaFilter.value) && areaFilter.value !== "all") areaFilter.value = "all";
@@ -148,6 +154,11 @@
       const areaVal = areaFilter.value;
       gallery.innerHTML = "";
 
+      const mode = modeSelector.value;
+      const allowedAreas = mode === "play" ? playAreas
+                          : mode === "setup" ? setupAreas
+                          : allAreas;
+
       images.forEach(img => {
         if ((classVal === "all" || img.class === classVal) &&
             (areaVal === "all" || img.status === areaVal)) {
@@ -156,11 +167,6 @@
           card.className = "card";
 
           const select = document.createElement("select");
-          const mode = modeSelector.value;
-          let allowedAreas = mode === "play" ? playAreas
-                            : mode === "setup" ? setupAreas
-                            : ["hand","active","play","discard","burn","locked","unused level one","unused level 2+"];
-
           allowedAreas.forEach(st => {
             const opt = document.createElement("option");
             opt.value = st;
@@ -193,12 +199,10 @@
     });
     classFilter.addEventListener("change", renderGallery);
     areaFilter.addEventListener("change", renderGallery);
-
     modeSelector.addEventListener("change", () => {
       updateAreaFilter();
       renderGallery();
     });
-
     resetAllBtn.addEventListener("click", () => {
       if (confirm("Reset all statuses to 'hand'?")) resetAllStatuses();
     });
