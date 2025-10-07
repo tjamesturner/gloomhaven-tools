@@ -150,19 +150,29 @@
 
     // Render gallery
     function renderGallery() {
-      const classVal = classFilter.value;
       const areaVal = areaFilter.value;
-      gallery.innerHTML = "";
-
       const mode = modeSelector.value;
       const allowedAreas = mode === "play" ? playAreas
                           : mode === "setup" ? setupAreas
                           : allAreas;
 
-      images.forEach(img => {
-        if ((classVal === "all" || img.class === classVal) &&
-            (areaVal === "all" || img.status === areaVal)) {
+      // Determine which classes to show
+      const selectedActiveClasses = Array.from(activeClasses.selectedOptions).map(o => o.value);
+      let classVal = classFilter.value;
 
+      gallery.innerHTML = "";
+
+      images.forEach(img => {
+        // Only show images whose class is in the active classes
+        if (selectedActiveClasses.length === 0) return; // nothing selected
+
+        const matchesClass = classVal === "all"
+          ? selectedActiveClasses.includes(img.class)
+          : img.class === classVal;
+
+        const matchesArea = areaVal === "all" || img.status === areaVal;
+
+        if (matchesClass && matchesArea) {
           const card = document.createElement("div");
           card.className = "card";
 
@@ -187,6 +197,7 @@
         }
       });
     }
+
 
     // Events
     activeClasses.addEventListener("change", () => {
