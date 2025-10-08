@@ -55,23 +55,29 @@
           outline-offset:2px;
         }
 
-        /* Area border colors (applied to .card via class) */
+        /* Area border colors */
         .hand { border:3px solid #9e9e9e; }      /* gray */
         .play { border:3px solid #2e8b57; }      /* green */
         .discard { border:3px solid #ff8c00; }   /* orange */
         .active { border:3px solid #1e90ff; }    /* blue */
         .burn { border:3px solid #d32f2f; }      /* red */
 
-        /* Quick-set buttons */
-        #setHandBtn, #setPlayBtn {
+        /* Buttons */
+        button {
           border-radius:6px;
           border:1px solid #aaa;
           background:#f2f2f2;
           cursor:pointer;
         }
-        #setHandBtn:hover,#setPlayBtn:hover { background:#e0e0e0; }
+        button:hover { background:#e0e0e0; }
 
-        /* small screens: increase spacing */
+        /* Mode buttons */
+        .mode-btn.active {
+          background:#4caf50;
+          color:white;
+          border-color:#388e3c;
+        }
+
         @media (max-width:480px){
           .controls { gap:8px; }
           select { font-size:13px; padding:6px; }
@@ -81,10 +87,8 @@
 <body>
 <div class="controls">
     <label>Mode:</label>
-    <select id="modeSelector">
-        <option value="setup">Setup</option>
-        <option value="play">Play</option>
-    </select>
+    <button id="setupBtn" class="mode-btn">Setup</button>
+    <button id="playBtn" class="mode-btn">Play</button>
 
     <label>Active Classes:</label>
     <select id="activeClasses" multiple size="4"></select>
@@ -101,10 +105,13 @@
         <option value="active">Active</option>
         <option value="burn">Burn</option>
     </select>
+
+    <button id="filterHandBtn">Hand</button>
+    <button id="filterPlayBtn">Play</button>
 </div>
 
 <div class="controls">
-    <label>Update Area for Selected:</label>
+    <label>Move to Area:</label>
     <select id="bulkAreaSelect">
         <option value="">--Select Area--</option>
         <option value="hand">Hand</option>
@@ -121,209 +128,166 @@
 <div id="gallery"></div>
 
 <script type="module">
-    /* index.html (module) - expects ./config.js exporting: export const images = [...]; export const allClasses = [...]; */
     import { images, allClasses } from './config.js';
 
-    /* DOM references */
     const gallery = document.getElementById('gallery');
-    const modeSelector = document.getElementById('modeSelector');
     const activeClassesSelect = document.getElementById('activeClasses');
     const classFilter = document.getElementById('classFilter');
     const areaFilter = document.getElementById('areaFilter');
     const bulkAreaSelect = document.getElementById('bulkAreaSelect');
     const setHandBtn = document.getElementById('setHandBtn');
     const setPlayBtn = document.getElementById('setPlayBtn');
+    const filterHandBtn = document.getElementById('filterHandBtn');
+    const filterPlayBtn = document.getElementById('filterPlayBtn');
+    const setupBtn = document.getElementById('setupBtn');
+    const playBtn = document.getElementById('playBtn');
 
-    /* constants */
-    const playAreas = ["hand","play","discard","active","burn"];
+    let mode = 'setup';
     let selectedCards = new Set();
 
-    /* --- persistence --- */
     function saveState(){
       const state = {
-        mode: modeSelector.value,
+        mode,
         activeClasses: Array.from(activeClassesSelect.selectedOptions).map(o=>o.value),
-        images // write the images array (status & playable are stored here)
+        images
       };
       localStorage.setItem('ghState', JSON.stringify(state));
     }
+
     function loadState(){
       const s = localStorage.getItem('ghState');
       if(!s) return;
       try{
         const obj = JSON.parse(s);
-        if(obj.mode) modeSelector.value = obj.mode;
+        if(obj.mode) mode = obj.mode;
         if(Array.isArray(obj.activeClasses)){
-          // ensure options exist first (we populate them before calling loadState in init)
           for(const opt of activeClassesSelect.options){
             opt.selected = obj.activeClasses.includes(opt.value);
           }
         }
         if(Array.isArray(obj.images)){
-          // merge saved image properties into our images array by matching url
-          const savedMap = new Map(obj.images.map(it => [it.url, it]));
-          images.forEach(img => {
+          const savedMap = new Map(obj.images.map(it=>[it.url,it]));
+          images.forEach(img=>{
             const saved = savedMap.get(img.url);
             if(saved){
-              if(typeof saved.status === 'string') img.status = saved.status;
-              if(typeof saved.playable === 'boolean') img.playable = saved.playable;
+              img.status = saved.status || img.status;
+              img.playable = saved.playable ?? img.playable;
             }
           });
         }
-      }catch(e){
-        console.warn('Failed to load state:', e);
-      }
+      }catch(e){ console.warn('Failed to load state:', e); }
     }
 
-    /* --- UI helpers --- */
     function populateActiveClasses(){
-      activeClassesSelect.innerHTML = '';
+      activeClassesSelect.innerHTML='';
       allClasses.forEach(cls=>{
-        const opt = document.createElement('option');
-        opt.value = cls;
-        opt.textContent = cls;
+        const opt=document.createElement('option');
+        opt.value=cls; opt.textContent=cls;
         activeClassesSelect.appendChild(opt);
       });
     }
     function updateClassFilter(){
       const selected = Array.from(activeClassesSelect.selectedOptions).map(o=>o.value);
-      classFilter.innerHTML = '<option value="all">All</option>';
+      classFilter.innerHTML='<option value="all">All</option>';
       selected.forEach(cls=>{
-        const opt = document.createElement('option');
-        opt.value = cls;
-        opt.textContent = cls;
+        const opt=document.createElement('option');
+        opt.value=cls; opt.textContent=cls;
         classFilter.appendChild(opt);
       });
     }
 
-    /* --- rendering --- */
+    function setMode(newMode){
+      mode=newMode;
+      if(mode==='play') selectedCards.clear();
+      else if(mode==='setup'){
+        selectedCards.clear();
+        images.forEach(img=>{ if(img.playable) selectedCards.add(img); });
+      }
+      setupBtn.classList.toggle('active',mode==='setup');
+      playBtn.classList.toggle('active',mode==='play');
+      saveState();
+      renderGallery();
+    }
+
     function renderGallery(){
-      const mode = modeSelector.value; // 'setup' or 'play'
-      const areaVal = areaFilter.value; // 'all' or area
-      const activeSelected = Array.from(activeClassesSelect.selectedOptions).map(o=>o.value);
-      if(activeSelected.length === 0){
-        gallery.innerHTML = '<p style="grid-column:1/-1;color:#666">No active classes selected.</p>';
+      const areaVal=areaFilter.value;
+      const activeSelected=Array.from(activeClassesSelect.selectedOptions).map(o=>o.value);
+      const classVal=classFilter.value;
+      if(activeSelected.length===0){
+        gallery.innerHTML='<p style="grid-column:1/-1;color:#666">No active classes selected.</p>';
         return;
       }
-      const classVal = classFilter.value;
 
-      // In setup mode, ensure playable cards are selected
-      if(mode === 'setup'){
-        // clear and repopulate selection with playable cards
+      if(mode==='setup'){
         selectedCards.clear();
-        images.forEach(img => { if(img.playable) selectedCards.add(img); });
+        images.forEach(img=>{ if(img.playable) selectedCards.add(img); });
       }
 
-      gallery.innerHTML = '';
+      gallery.innerHTML='';
       images.forEach(img=>{
-        // filter by active classes / class filter
         if(!activeSelected.includes(img.class)) return;
-        if(classVal !== 'all' && img.class !== classVal) return;
+        if(classVal!=='all' && img.class!==classVal) return;
+        if(mode==='play' && !img.playable) return;
+        if(areaVal!=='all' && img.status!==areaVal) return;
 
-        // filter by playability in play mode
-        if(mode === 'play' && !img.playable) return;
-
-        // filter by area filter
-        if(areaVal !== 'all' && img.status !== areaVal) return;
-
-        // build card
-        const card = document.createElement('div');
-        card.className = 'card ' + (img.status || 'hand');
-
-        // image
-        const el = document.createElement('img');
-        el.src = img.url;
-        el.alt = img.class;
-
-        // selection highlight
+        const card=document.createElement('div');
+        card.className='card '+(img.status||'hand');
+        const el=document.createElement('img');
+        el.src=img.url; el.alt=img.class;
         if(selectedCards.has(img)) card.classList.add('selected');
-        else card.classList.remove('selected');
-
-        // click behavior
-        el.addEventListener('click', () => {
-          if(mode === 'setup'){
-            // toggle playable and selection
-            img.playable = !img.playable;
+        el.addEventListener('click',()=>{
+          if(mode==='setup'){
+            img.playable=!img.playable;
             if(img.playable) selectedCards.add(img);
             else selectedCards.delete(img);
           } else {
-            // play mode: toggle selection only
             if(selectedCards.has(img)) selectedCards.delete(img);
             else selectedCards.add(img);
           }
-          saveState();
-          renderGallery();
+          saveState(); renderGallery();
         });
-
         card.appendChild(el);
         gallery.appendChild(card);
       });
     }
 
-    /* --- bulk area update handler --- */
-    bulkAreaSelect.addEventListener('change', () => {
-      const newArea = bulkAreaSelect.value;
+    /* Bulk move */
+    bulkAreaSelect.addEventListener('change',()=>{
+      const newArea=bulkAreaSelect.value;
       if(!newArea) return;
-      selectedCards.forEach(img => { img.status = newArea; });
-      // clear selection after bulk update
+      selectedCards.forEach(img=>{ img.status=newArea; });
       selectedCards.clear();
-      bulkAreaSelect.value = '';
-      saveState();
-      renderGallery();
+      bulkAreaSelect.value='';
+      saveState(); renderGallery();
     });
 
-    /* quick-set buttons apply the bulk selection */
-    setHandBtn.addEventListener('click', () => {
-      bulkAreaSelect.value = 'hand';
-      bulkAreaSelect.dispatchEvent(new Event('change'));
-    });
-    setPlayBtn.addEventListener('click', () => {
-      bulkAreaSelect.value = 'play';
-      bulkAreaSelect.dispatchEvent(new Event('change'));
-    });
+    /* Quick-set buttons for bulk move */
+    setHandBtn.addEventListener('click',()=>{bulkAreaSelect.value='hand';bulkAreaSelect.dispatchEvent(new Event('change'));});
+    setPlayBtn.addEventListener('click',()=>{bulkAreaSelect.value='play';bulkAreaSelect.dispatchEvent(new Event('change'));});
 
-    /* top filters events */
-    /* changing the areaFilter should only FILTER the gallery (not change card statuses) */
-    areaFilter.addEventListener('change', () => {
-      renderGallery();
+    /* Filter area buttons */
+    filterHandBtn.addEventListener('click',()=>{areaFilter.value='hand';renderGallery();});
+    filterPlayBtn.addEventListener('click',()=>{areaFilter.value='play';renderGallery();});
+
+    /* Other controls */
+    areaFilter.addEventListener('change',renderGallery);
+    activeClassesSelect.addEventListener('change',()=>{
+      const sel=Array.from(activeClassesSelect.selectedOptions);
+      if(sel.length>4){ sel[sel.length-1].selected=false; alert('You can select up to 4 active classes.'); }
+      updateClassFilter(); saveState(); renderGallery();
     });
+    classFilter.addEventListener('change',renderGallery);
+    setupBtn.addEventListener('click',()=>setMode('setup'));
+    playBtn.addEventListener('click',()=>setMode('play'));
 
-    /* active classes: limit to 4, update class filter, persist */
-    activeClassesSelect.addEventListener('change', () => {
-      const sel = Array.from(activeClassesSelect.selectedOptions);
-      if(sel.length > 4){
-        // deselect the last selected and inform the user
-        sel[sel.length - 1].selected = false;
-        alert('You can select up to 4 active classes.');
-      }
-      updateClassFilter();
-      saveState();
-      renderGallery();
-    });
-
-    /* class filter changes */
-    classFilter.addEventListener('change', renderGallery);
-
-    /* mode change: switching to play clears all selected cards; switching to setup will select playable cards */
-    modeSelector.addEventListener('change', () => {
-      if(modeSelector.value === 'play') selectedCards.clear();
-      else if(modeSelector.value === 'setup'){
-        selectedCards.clear();
-        images.forEach(img => { if(img.playable) selectedCards.add(img); });
-      }
-      saveState();
-      renderGallery();
-    });
-
-    /* --- init --- */
+    /* Init */
     function init(){
       populateActiveClasses();
-      loadState();            // will set mode, activeClasses selection, and image playable/status values
+      loadState();
       updateClassFilter();
-      renderGallery();
+      setMode(mode);
     }
     init();
-
 </script>
 </body>
 </html>
