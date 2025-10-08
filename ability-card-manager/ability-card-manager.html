@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Gloomhaven Card Browser</title>
     <style>
         body {
@@ -12,234 +12,318 @@
           background-size: auto;
         }
 
-        h1 { text-align: center; }
+        .controls {
+          display:flex;
+          flex-wrap:wrap;
+          gap:10px;
+          align-items:center;
+          margin-bottom:12px;
+        }
 
-        .filters { display: flex; justify-content: center; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
-        select { padding: 6px; font-size: 14px; }
-        .controls { margin-top: 10px; text-align: center; display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-        button { padding: 6px 12px; font-size: 14px; margin-bottom: 10px; }
-        .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 15px; }
-        .card { background: white; padding: 10px; border-radius: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.2); text-align: center; }
-        .card img { max-width: 100%; border-radius: 6px; cursor: pointer; box-sizing: border-box; }
+        label { font-size:14px; margin-right:6px; }
+        select, button { font-size:14px; padding:6px 8px; }
+
+        #gallery {
+          display:grid;
+          grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+          gap:10px;
+        }
+
+        .card {
+          position:relative;
+          border-radius:8px;
+          overflow:hidden;
+          padding:4px;
+          background:#fff;
+          box-shadow:0 0 4px rgba(0,0,0,0.12);
+          display:flex;
+          align-items:center;
+          justify-content:center;
+        }
+
+        .card img {
+          width:100%;
+          display:block;
+          border-radius:6px;
+          box-sizing:border-box;
+          cursor:pointer;
+        }
+
+        /* Selection highlight */
+        .selected {
+          outline:4px solid gold;
+          outline-offset:2px;
+        }
+
+        /* Area border colors (applied to .card via class) */
+        .hand { border:3px solid #9e9e9e; }      /* gray */
+        .play { border:3px solid #2e8b57; }      /* green */
+        .discard { border:3px solid #ff8c00; }   /* orange */
+        .active { border:3px solid #1e90ff; }    /* blue */
+        .burn { border:3px solid #d32f2f; }      /* red */
+
+        /* Quick-set buttons */
+        #setHandBtn, #setPlayBtn {
+          border-radius:6px;
+          border:1px solid #aaa;
+          background:#f2f2f2;
+          cursor:pointer;
+        }
+        #setHandBtn:hover,#setPlayBtn:hover { background:#e0e0e0; }
+
+        /* small screens: increase spacing */
+        @media (max-width:480px){
+          .controls { gap:8px; }
+          select { font-size:13px; padding:6px; }
+        }
     </style>
 </head>
 <body>
-<h1>Gloomhaven Card Browser</h1>
+<div class="controls">
+    <label>Mode:</label>
+    <select id="modeSelector">
+        <option value="setup">Setup</option>
+        <option value="play">Play</option>
+    </select>
 
-<div class="filters">
-    <label>
-        Mode:<br>
-        <select id="modeSelector">
-            <option value="all">All Areas</option>
-            <option value="setup">Setup</option>
-            <option value="play">Play</option>
-        </select>
-    </label>
+    <label>Active Classes:</label>
+    <select id="activeClasses" multiple size="4"></select>
 
-    <label>
-        Active Classes (pick up to 4):<br>
-        <select id="activeClasses" multiple size="6"></select>
-    </label>
+    <label>Class:</label>
+    <select id="classFilter"><option value="all">All</option></select>
 
-    <label>
-        Class:<br>
-        <select id="classFilter"><option value="all">All</option></select>
-    </label>
-
-    <label>
-        Area:<br>
-        <select id="areaFilter">
-            <option value="all">All</option>
-            <option value="hand">Hand</option>
-            <option value="active">Active</option>
-            <option value="play">Play</option>
-            <option value="discard">Discard</option>
-            <option value="burn">Burn</option>
-        </select>
-    </label>
+    <label>Filter Area:</label>
+    <select id="areaFilter">
+        <option value="all">All</option>
+        <option value="hand">Hand</option>
+        <option value="play">Play</option>
+        <option value="discard">Discard</option>
+        <option value="active">Active</option>
+        <option value="burn">Burn</option>
+    </select>
 </div>
 
 <div class="controls">
-    <label>
-        Update Area for Selected Cards:
-        <select id="bulkAreaSelect">
-            <option value="">--Select Area--</option>
-            <option value="hand">Hand</option>
-            <option value="active">Active</option>
-            <option value="play">Play</option>
-            <option value="discard">Discard</option>
-            <option value="burn">Burn</option>
-        </select>
-    </label>
-    <button id="moveToHand">Move Play Mode Cards to Hand</button>
-    <button id="moveToUnused">Move Play Mode Cards to Unused</button>
+    <label>Update Area for Selected:</label>
+    <select id="bulkAreaSelect">
+        <option value="">--Select Area--</option>
+        <option value="hand">Hand</option>
+        <option value="play">Play</option>
+        <option value="discard">Discard</option>
+        <option value="active">Active</option>
+        <option value="burn">Burn</option>
+    </select>
+
+    <button id="setHandBtn">Hand</button>
+    <button id="setPlayBtn">Play</button>
 </div>
 
-<div class="gallery" id="gallery"></div>
+<div id="gallery"></div>
 
-<script src="config.js"></script>
-<script>
-    const gallery = document.getElementById("gallery");
-    const activeClasses = document.getElementById("activeClasses");
-    const classFilter = document.getElementById("classFilter");
-    const areaFilter = document.getElementById("areaFilter");
-    const bulkAreaSelect = document.getElementById("bulkAreaSelect");
-    const moveToHandBtn = document.getElementById("moveToHand");
-    const moveToUnusedBtn = document.getElementById("moveToUnused");
-    const modeSelector = document.getElementById("modeSelector");
+<script type="module">
+    /* index.html (module) - expects ./config.js exporting: export const images = [...]; export const allClasses = [...]; */
+    import { images, allClasses } from './config.js';
 
+    /* DOM references */
+    const gallery = document.getElementById('gallery');
+    const modeSelector = document.getElementById('modeSelector');
+    const activeClassesSelect = document.getElementById('activeClasses');
+    const classFilter = document.getElementById('classFilter');
+    const areaFilter = document.getElementById('areaFilter');
+    const bulkAreaSelect = document.getElementById('bulkAreaSelect');
+    const setHandBtn = document.getElementById('setHandBtn');
+    const setPlayBtn = document.getElementById('setPlayBtn');
+
+    /* constants */
     const playAreas = ["hand","play","discard","active","burn"];
-    const allAreas = ["hand","active","play","discard","burn"];
-    const areaColors = {
-      hand: "gray", active: "blue", play: "green", discard: "orange", burn: "red"
-    };
-
     let selectedCards = new Set();
 
-    function saveState() {
-      const obj = {
-        statuses: {},
+    /* --- persistence --- */
+    function saveState(){
+      const state = {
         mode: modeSelector.value,
-        activeClasses: Array.from(activeClasses.selectedOptions).map(o => o.value),
-        playable: {}
+        activeClasses: Array.from(activeClassesSelect.selectedOptions).map(o=>o.value),
+        images // write the images array (status & playable are stored here)
       };
-      images.forEach(img => {
-        obj.statuses[img.url] = img.status;
-        obj.playable[img.url] = img.playable;
-      });
-      localStorage.setItem("cardState", JSON.stringify(obj));
+      localStorage.setItem('ghState', JSON.stringify(state));
     }
-
-    function loadSavedState() {
-      const saved = localStorage.getItem("cardState");
-      if(saved) {
-        const obj = JSON.parse(saved);
-        images.forEach(img => {
-          if(obj.statuses[img.url]) img.status = obj.statuses[img.url];
-          if(obj.playable[img.url] !== undefined) img.playable = obj.playable[img.url];
-        });
+    function loadState(){
+      const s = localStorage.getItem('ghState');
+      if(!s) return;
+      try{
+        const obj = JSON.parse(s);
         if(obj.mode) modeSelector.value = obj.mode;
-        if(obj.activeClasses) {
-          Array.from(activeClasses.options).forEach(opt => {
+        if(Array.isArray(obj.activeClasses)){
+          // ensure options exist first (we populate them before calling loadState in init)
+          for(const opt of activeClassesSelect.options){
             opt.selected = obj.activeClasses.includes(opt.value);
+          }
+        }
+        if(Array.isArray(obj.images)){
+          // merge saved image properties into our images array by matching url
+          const savedMap = new Map(obj.images.map(it => [it.url, it]));
+          images.forEach(img => {
+            const saved = savedMap.get(img.url);
+            if(saved){
+              if(typeof saved.status === 'string') img.status = saved.status;
+              if(typeof saved.playable === 'boolean') img.playable = saved.playable;
+            }
           });
         }
+      }catch(e){
+        console.warn('Failed to load state:', e);
       }
     }
 
-    function populateActiveClasses() {
-      allClasses.forEach(cls => {
-        const opt = document.createElement("option");
+    /* --- UI helpers --- */
+    function populateActiveClasses(){
+      activeClassesSelect.innerHTML = '';
+      allClasses.forEach(cls=>{
+        const opt = document.createElement('option');
         opt.value = cls;
         opt.textContent = cls;
-        activeClasses.appendChild(opt);
+        activeClassesSelect.appendChild(opt);
       });
     }
-
-    function updateClassFilter() {
-      const selected = Array.from(activeClasses.selectedOptions).map(o => o.value);
-      classFilter.innerHTML = "<option value='all'>All</option>";
-      selected.forEach(cls => {
-        const opt = document.createElement("option");
+    function updateClassFilter(){
+      const selected = Array.from(activeClassesSelect.selectedOptions).map(o=>o.value);
+      classFilter.innerHTML = '<option value="all">All</option>';
+      selected.forEach(cls=>{
+        const opt = document.createElement('option');
         opt.value = cls;
         opt.textContent = cls;
         classFilter.appendChild(opt);
       });
     }
 
-    function updateAreaFilter() {
-      const mode = modeSelector.value;
-      areaFilter.innerHTML = "<option value='all'>All</option>";
-      allAreas.forEach(a => areaFilter.appendChild(new Option(a, a)));
-      if(!allAreas.includes(areaFilter.value) && areaFilter.value !== "all") areaFilter.value = "all";
-    }
-
-    function renderGallery() {
-      const mode = modeSelector.value;
-      const areaVal = areaFilter.value;
-      const selectedActiveClasses = Array.from(activeClasses.selectedOptions).map(o => o.value);
+    /* --- rendering --- */
+    function renderGallery(){
+      const mode = modeSelector.value; // 'setup' or 'play'
+      const areaVal = areaFilter.value; // 'all' or area
+      const activeSelected = Array.from(activeClassesSelect.selectedOptions).map(o=>o.value);
+      if(activeSelected.length === 0){
+        gallery.innerHTML = '<p style="grid-column:1/-1;color:#666">No active classes selected.</p>';
+        return;
+      }
       const classVal = classFilter.value;
 
-      if(mode === "setup") {
-        // auto-select playable cards
+      // In setup mode, ensure playable cards are selected
+      if(mode === 'setup'){
+        // clear and repopulate selection with playable cards
         selectedCards.clear();
         images.forEach(img => { if(img.playable) selectedCards.add(img); });
       }
 
-      gallery.innerHTML = "";
-      images.forEach(img => {
-        if(selectedActiveClasses.length === 0) return;
-        const matchesClass = classVal === "all" ? selectedActiveClasses.includes(img.class) : img.class === classVal;
-        const matchesArea = areaVal === "all" || img.status === areaVal;
-        if(!matchesClass || !matchesArea) return;
-        if(mode === "play" && !img.playable) return;
+      gallery.innerHTML = '';
+      images.forEach(img=>{
+        // filter by active classes / class filter
+        if(!activeSelected.includes(img.class)) return;
+        if(classVal !== 'all' && img.class !== classVal) return;
 
-        const card = document.createElement("div");
-        card.className = "card";
+        // filter by playability in play mode
+        if(mode === 'play' && !img.playable) return;
 
-        const imgElement = document.createElement("img");
-        imgElement.src = img.url;
-        imgElement.alt = img.class;
-        imgElement.style.border = `4px solid ${areaColors[img.status] || "black"}`;
-        imgElement.style.borderRadius = "6px";
-        imgElement.style.cursor = "pointer";
-        imgElement.style.boxSizing = "border-box";
-        if(selectedCards.has(img)) imgElement.style.boxShadow = "0 0 10px 4px yellow";
-        else imgElement.style.boxShadow = "";
+        // filter by area filter
+        if(areaVal !== 'all' && img.status !== areaVal) return;
 
-        imgElement.addEventListener("click", () => {
-          if(mode === "setup") { img.playable = true; selectedCards.add(img); }
-          else { if(selectedCards.has(img)) selectedCards.delete(img); else selectedCards.add(img); }
+        // build card
+        const card = document.createElement('div');
+        card.className = 'card ' + (img.status || 'hand');
+
+        // image
+        const el = document.createElement('img');
+        el.src = img.url;
+        el.alt = img.class;
+
+        // selection highlight
+        if(selectedCards.has(img)) card.classList.add('selected');
+        else card.classList.remove('selected');
+
+        // click behavior
+        el.addEventListener('click', () => {
+          if(mode === 'setup'){
+            // toggle playable and selection
+            img.playable = !img.playable;
+            if(img.playable) selectedCards.add(img);
+            else selectedCards.delete(img);
+          } else {
+            // play mode: toggle selection only
+            if(selectedCards.has(img)) selectedCards.delete(img);
+            else selectedCards.add(img);
+          }
           saveState();
           renderGallery();
         });
 
-        card.appendChild(imgElement);
+        card.appendChild(el);
         gallery.appendChild(card);
       });
     }
 
-    // Bulk area update
-    bulkAreaSelect.addEventListener("change", () => {
+    /* --- bulk area update handler --- */
+    bulkAreaSelect.addEventListener('change', () => {
       const newArea = bulkAreaSelect.value;
       if(!newArea) return;
-      selectedCards.forEach(img => img.status = newArea);
+      selectedCards.forEach(img => { img.status = newArea; });
+      // clear selection after bulk update
       selectedCards.clear();
-      bulkAreaSelect.value = "";
+      bulkAreaSelect.value = '';
       saveState();
       renderGallery();
     });
 
-    // Move Play Mode Cards
-    function movePlayModeCards(targetArea) {
-      images.forEach(img => { if(playAreas.includes(img.status)) img.status = targetArea; });
-      saveState();
+    /* quick-set buttons apply the bulk selection */
+    setHandBtn.addEventListener('click', () => {
+      bulkAreaSelect.value = 'hand';
+      bulkAreaSelect.dispatchEvent(new Event('change'));
+    });
+    setPlayBtn.addEventListener('click', () => {
+      bulkAreaSelect.value = 'play';
+      bulkAreaSelect.dispatchEvent(new Event('change'));
+    });
+
+    /* top filters events */
+    /* changing the areaFilter should only FILTER the gallery (not change card statuses) */
+    areaFilter.addEventListener('change', () => {
       renderGallery();
-    }
+    });
 
-    moveToHandBtn.addEventListener("click", () => movePlayModeCards("hand"));
-    moveToUnusedBtn.addEventListener("click", () => movePlayModeCards("unused"));
-
-    activeClasses.addEventListener("change", () => {
-      if(activeClasses.selectedOptions.length > 4) {
-        alert("You can only select up to 4 active classes.");
-        Array.from(activeClasses.options).forEach(opt => opt.selected = false);
+    /* active classes: limit to 4, update class filter, persist */
+    activeClassesSelect.addEventListener('change', () => {
+      const sel = Array.from(activeClassesSelect.selectedOptions);
+      if(sel.length > 4){
+        // deselect the last selected and inform the user
+        sel[sel.length - 1].selected = false;
+        alert('You can select up to 4 active classes.');
       }
       updateClassFilter();
       saveState();
       renderGallery();
     });
 
-    classFilter.addEventListener("change", renderGallery);
-    areaFilter.addEventListener("change", renderGallery);
-    modeSelector.addEventListener("change", () => { updateAreaFilter(); saveState(); renderGallery(); });
+    /* class filter changes */
+    classFilter.addEventListener('change', renderGallery);
 
-    // Initialize
-    populateActiveClasses();
-    loadSavedState();
-    updateClassFilter();
-    updateAreaFilter();
-    renderGallery();
+    /* mode change: switching to play clears all selected cards; switching to setup will select playable cards */
+    modeSelector.addEventListener('change', () => {
+      if(modeSelector.value === 'play') selectedCards.clear();
+      else if(modeSelector.value === 'setup'){
+        selectedCards.clear();
+        images.forEach(img => { if(img.playable) selectedCards.add(img); });
+      }
+      saveState();
+      renderGallery();
+    });
+
+    /* --- init --- */
+    function init(){
+      populateActiveClasses();
+      loadState();            // will set mode, activeClasses selection, and image playable/status values
+      updateClassFilter();
+      renderGallery();
+    }
+    init();
+
 </script>
 </body>
 </html>

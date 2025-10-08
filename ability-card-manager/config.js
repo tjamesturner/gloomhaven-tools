@@ -1,5 +1,5 @@
     // all 18 gloomhaven 2nd edition classes
-    const allClasses = [
+    export const allClasses = [
         "doomstalker",
         "berserker",
         "bladeswarm",
@@ -20,7 +20,7 @@
         "wildfury"
     ];
 
-    const images = [
+    export const images = [
         { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/BR2/balanced-measure.jpeg", class: "bruiser", status: "hand" },
         { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/BR2/eye-for-an-eye.jpeg", class: "bruiser", status: "hand" },
         { url: "https://raw.githubusercontent.com/cmlenius/gloomhaven-card-browser/images/images/character-ability-cards/gloomhaven-2nd-edition/BR2/grab-and-go.jpeg", class: "bruiser", status: "hand" },
