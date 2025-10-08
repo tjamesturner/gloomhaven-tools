@@ -49,18 +49,18 @@
           cursor:pointer;
         }
 
-        /* Selection highlight */
+        /* Selection highlight (blueish) */
         .selected {
-          outline:4px solid gold;
+          outline:4px solid #2196f3;
           outline-offset:2px;
         }
 
         /* Area border colors */
-        .hand { border:3px solid #9e9e9e; }      /* gray */
-        .play { border:3px solid #2e8b57; }      /* green */
-        .discard { border:3px solid #ff8c00; }   /* orange */
-        .active { border:3px solid #1e90ff; }    /* blue */
-        .burn { border:3px solid #d32f2f; }      /* red */
+        .hand { border:3px solid #9e9e9e; }
+        .play { border:3px solid #2e8b57; }
+        .discard { border:3px solid #ff8c00; }
+        .active { border:3px solid #1e90ff; }
+        .burn { border:3px solid #d32f2f; }
 
         /* Buttons */
         button {
@@ -78,6 +78,9 @@
           border-color:#388e3c;
         }
 
+        /* Hidden controls in setup mode */
+        .hidden { display:none; }
+
         @media (max-width:480px){
           .controls { gap:8px; }
           select { font-size:13px; padding:6px; }
@@ -90,13 +93,16 @@
     <button id="setupBtn" class="mode-btn">Setup</button>
     <button id="playBtn" class="mode-btn">Play</button>
 
-    <label>Active Classes:</label>
+    <label for="activeClasses">Active Classes:</label>
     <select id="activeClasses" multiple size="4"></select>
 
-    <label>Class:</label>
+    <label for="classFilter">Class:</label>
     <select id="classFilter"><option value="all">All</option></select>
+</div>
 
-    <label>Filter Area:</label>
+<!-- Area Filter + Buttons -->
+<div class="controls area-controls">
+    <label for="areaFilter">Filter Area:</label>
     <select id="areaFilter">
         <option value="all">All</option>
         <option value="hand">Hand</option>
@@ -105,13 +111,13 @@
         <option value="active">Active</option>
         <option value="burn">Burn</option>
     </select>
-
     <button id="filterHandBtn">Hand</button>
     <button id="filterPlayBtn">Play</button>
 </div>
 
-<div class="controls">
-    <label>Move to Area:</label>
+<!-- Move Area Controls -->
+<div class="controls area-controls">
+    <label for="bulkAreaSelect">Move to Area:</label>
     <select id="bulkAreaSelect">
         <option value="">--Select Area--</option>
         <option value="hand">Hand</option>
@@ -141,6 +147,7 @@
     const filterPlayBtn = document.getElementById('filterPlayBtn');
     const setupBtn = document.getElementById('setupBtn');
     const playBtn = document.getElementById('playBtn');
+    const areaControls = document.querySelectorAll('.area-controls');
 
     let mode = 'setup';
     let selectedCards = new Set();
@@ -205,6 +212,7 @@
       }
       setupBtn.classList.toggle('active',mode==='setup');
       playBtn.classList.toggle('active',mode==='play');
+      areaControls.forEach(el=>el.classList.toggle('hidden',mode==='setup'));
       saveState();
       renderGallery();
     }
@@ -228,7 +236,7 @@
         if(!activeSelected.includes(img.class)) return;
         if(classVal!=='all' && img.class!==classVal) return;
         if(mode==='play' && !img.playable) return;
-        if(areaVal!=='all' && img.status!==areaVal) return;
+        if(mode==='play' && areaVal!=='all' && img.status!==areaVal) return;
 
         const card=document.createElement('div');
         card.className='card '+(img.status||'hand');
@@ -253,6 +261,7 @@
 
     /* Bulk move */
     bulkAreaSelect.addEventListener('change',()=>{
+      if(mode==='setup') return; // disable in setup
       const newArea=bulkAreaSelect.value;
       if(!newArea) return;
       selectedCards.forEach(img=>{ img.status=newArea; });
@@ -262,8 +271,16 @@
     });
 
     /* Quick-set buttons for bulk move */
-    setHandBtn.addEventListener('click',()=>{bulkAreaSelect.value='hand';bulkAreaSelect.dispatchEvent(new Event('change'));});
-    setPlayBtn.addEventListener('click',()=>{bulkAreaSelect.value='play';bulkAreaSelect.dispatchEvent(new Event('change'));});
+    setHandBtn.addEventListener('click',()=>{
+      if(mode==='setup') return;
+      bulkAreaSelect.value='hand';
+      bulkAreaSelect.dispatchEvent(new Event('change'));
+    });
+    setPlayBtn.addEventListener('click',()=>{
+      if(mode==='setup') return;
+      bulkAreaSelect.value='play';
+      bulkAreaSelect.dispatchEvent(new Event('change'));
+    });
 
     /* Filter area buttons */
     filterHandBtn.addEventListener('click',()=>{areaFilter.value='hand';renderGallery();});
